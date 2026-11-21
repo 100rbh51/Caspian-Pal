@@ -140,7 +140,10 @@ const [searchBusy, setSearchBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [draft, setDraft] = useState({ category: 'Study', section: 'school', title: '', venue: '', desc: '' });
   const [draftErr, setDraftErr] = useState('');
-  const [messages, setMessages] = useState([{ mine: false, sender: 'Caspian Pal', text: 'Namaskar Dosto! Welcome to the Caspian Pal community.', time: '10:00 AM' }]);
+  const [messages, setMessages] = useState([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState('');
   const [inputMessage, setInputMessage] = useState('');
   const [inCall, setInCall] = useState(false);
   const chatEnd = useRef(null);
@@ -157,6 +160,56 @@ const [searchBusy, setSearchBusy] = useState(false);
   }, [resend]);
 
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, tab]);
+
+  useEffect(() => {
+    if (screen !== 'dashboard' || tab !== 'message' || !currentUser?.id) return;
+
+    let active = true;
+    setChatLoading(true);
+    setChatError('');
+
+    const loadMessages = async () => {
+      const { data, error } = await supabase
+        .from('community_messages')
+        .select('id, user_id, sender_name, body, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (!active) return;
+      setChatLoading(false);
+      if (error) {
+        console.error('Community chat load error:', error.message);
+        setChatError('Messages load nahi hue. Supabase table setup check karein.');
+        return;
+      }
+      setMessages((data || []).reverse());
+    };
+
+    loadMessages();
+
+    const channel = supabase
+      .channel('community-messages-live')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'community_messages',
+      }, (payload) => {
+        if (!active) return;
+        setMessages((previous) => {
+          if (previous.some((message) => message.id === payload.new.id)) return previous;
+          return [...previous, payload.new];
+        });
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Community chat realtime status:', status);
+          if (active) setChatError('Live updates connect nahi hue. Supabase Realtime setup check karein.');
+        }
+      });
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [screen, tab, currentUser?.id]);
 useEffect(() => {
   const term = query.trim().replace(/^@/, '');
 
@@ -196,6 +249,7 @@ useEffect(() => {
   };
 }, [query]);
   const toUser = (u) => ({
+    id: u.id,
     name: u.user_metadata?.name || u.user_metadata?.full_name || u.email || u.phone || 'Member',
     email: u.email || '',
     phone: u.phone ? '+' + u.phone.replace('+', '') : '',
@@ -408,9 +462,32 @@ useEffect(() => {
     showToast('Activity published.');
   };
 
-  const send = () => {
-    if (!inputMessage.trim()) return;
-    setMessages((p) => [...p, { mine: true, sender: 'You', text: inputMessage.trim(), time: 'Just now' }]);
+  const send = async () => {
+    const body = inputMessage.trim();
+    if (!body || chatBusy || !currentUser?.id) return;
+    if (body.length > 2000) {
+      showToast('Message 2000 characters se chhota rakhein.', 'err');
+      return;
+    }
+
+    setChatBusy(true);
+    setChatError('');
+    const { data, error } = await supabase
+      .from('community_messages')
+      .insert({ user_id: currentUser.id, sender_name: currentUser.name || 'Member', body })
+      .select('id, user_id, sender_name, body, created_at')
+      .single();
+    setChatBusy(false);
+
+    if (error) {
+      console.error('Community chat send error:', error.message);
+      setChatError('Message send nahi hua. Table/policy setup check karein.');
+      return;
+    }
+
+    setMessages((previous) => previous.some((message) => message.id === data.id)
+      ? previous
+      : [...previous, data]);
     setInputMessage('');
   };
 
@@ -760,25 +837,36 @@ useEffect(() => {
                   <div className="px-4 py-3 border-b border-[#1c2030] flex items-center justify-between">
                     <div>
                       <h4 className="font-bold text-sm">Community chat</h4>
-                      <p className="text-xs text-teal-300">Demo conversation</p>
+                      <p className="text-xs text-teal-300">Shared chat · Live updates</p>
                     </div>
                     <button aria-label="Start video call" onClick={() => setInCall(true)} className="w-10 h-10 rounded-full bg-[#171a24] text-teal-300 flex items-center justify-center"><Video size={18} /></button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-                    {messages.map((m, i) => (
-                      <div key={i} className={`flex ${m.mine ? 'justify-end' : 'justify-start'}`}>
-                        <div className="max-w-[78%]">
-                          <div className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed ${m.mine ? 'bg-amber-400 text-[#1a1300] rounded-br-md' : 'bg-[#1a1e2b] text-slate-100 rounded-bl-md'}`}>{m.text}</div>
-                          <p className={`text-[10px] text-slate-500 mt-1 ${m.mine ? 'text-right' : ''}`}>{m.sender} · {m.time}</p>
+                    {chatLoading && <p className="text-center text-sm text-slate-400 py-4">Loading messages...</p>}
+                    {!chatLoading && messages.length === 0 && !chatError && (
+                      <p className="text-center text-sm text-slate-400 py-8">Abhi koi message nahi. Pehla message aap bhejein!</p>
+                    )}
+                    {messages.map((m) => {
+                      const mine = m.user_id === currentUser?.id;
+                      const time = m.created_at
+                        ? new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                        : '';
+                      return (
+                        <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                          <div className="max-w-[78%]">
+                            <div className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed ${mine ? 'bg-amber-400 text-[#1a1300] rounded-br-md' : 'bg-[#1a1e2b] text-slate-100 rounded-bl-md'}`}>{m.body}</div>
+                            <p className={`text-[10px] text-slate-500 mt-1 ${mine ? 'text-right' : ''}`}>{mine ? 'You' : m.sender_name} · {time}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
+                    {chatError && <p role="alert" className="text-center text-xs text-rose-300 py-2">{chatError}</p>}
                     <div ref={chatEnd} />
                   </div>
                   <div className="p-3 border-t border-[#1c2030] flex gap-2">
-                    <input value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()}
+                    <input value={inputMessage} maxLength={2000} onChange={(e) => setInputMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
                       placeholder="Write a message" className={inputCls + ' h-11 text-sm'} />
-                    <button aria-label="Send" onClick={send} className="w-11 h-11 shrink-0 rounded-xl bg-amber-400 text-[#1a1300] flex items-center justify-center"><Send size={17} /></button>
+                    <button aria-label="Send" onClick={send} disabled={chatBusy || !inputMessage.trim()} className="w-11 h-11 shrink-0 rounded-xl bg-amber-400 text-[#1a1300] flex items-center justify-center disabled:opacity-50"><Send size={17} /></button>
                   </div>
                 </div>
               )}
