@@ -565,10 +565,6 @@ useEffect(() => {
                 <div className="cp-in absolute inset-[6px] rounded-[1.7rem] overflow-hidden border-4 border-white shadow-xl bg-slate-200" style={{ animation: 'cpPop .8s cubic-bezier(.2,.8,.2,1) .1s forwards, cpFloat 5s ease-in-out 1s infinite' }}>
                   <Photo local="welcome.jpg" remote="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80" alt="Caspian Pal" className="w-full h-full object-cover" />
                 </div>
-                {[['Travel', '-left-10 top-2', 600], ['Sports', '-right-12 top-10', 750], ['Study', '-left-12 bottom-6', 900], ['Dancing', '-right-10 -bottom-1', 1050]].map(([l, pos, d], i) => (
-                  <span key={l} className={`cp-chip absolute ${pos} px-3 py-1.5 rounded-full bg-white text-[11px] font-bold text-blue-700 shadow-lg border border-sky-100`}
-                    style={{ animationDelay: `${d}ms, ${d + 600}ms`, animationDuration: `.6s, ${3.6 + i * 0.5}s` }}>{l}</span>
-                ))}
               </div>
 
               <h1 className="cp-in text-3xl font-extrabold text-center mt-9" style={{ animationDelay: '.35s' }}>Welcome to Caspian Pal</h1>
@@ -587,7 +583,6 @@ useEffect(() => {
                 <span className="relative">Get Started</span>
                 <ChevronLeft size={20} className="relative rotate-180" style={{ animation: 'cpNudge 1.4s ease-in-out infinite' }} />
               </button>
-              <p className="text-center text-xs text-slate-400">Free to join. Ages 13 and up.</p>
             </div>
           </div>
         )}
