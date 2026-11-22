@@ -589,14 +589,21 @@ useEffect(() => {
 
         {/* AUTH */}
         {screen === 'auth' && (
-          <div className="flex flex-col h-full p-6">
-            <button aria-label="Back" onClick={() => setScreen('welcome')} className="self-start p-2 -ml-2 text-slate-300"><ChevronLeft /></button>
-            <div className="my-auto text-center">
-              <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-400 text-[#1a1300] flex items-center justify-center text-3xl font-black mb-6">CP</div>
+          <div className="cp-auth relative flex flex-col h-full p-6 overflow-hidden bg-[#0e1017]">
+            <style>{`
+              @keyframes cpAuthDrift{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(14px,-18px,0) scale(1.1)}}
+              @media (prefers-reduced-motion:reduce){.cp-auth-glow{animation:none!important}}
+            `}</style>
+            <div aria-hidden className="cp-auth-glow absolute -top-16 -left-20 w-64 h-64 rounded-full bg-sky-400/25 blur-[85px] pointer-events-none" style={{ animation: 'cpAuthDrift 9s ease-in-out infinite' }} />
+            <div aria-hidden className="cp-auth-glow absolute top-[28%] -right-24 w-64 h-64 rounded-full bg-indigo-500/25 blur-[90px] pointer-events-none" style={{ animation: 'cpAuthDrift 11s ease-in-out infinite reverse' }} />
+            <div aria-hidden className="cp-auth-glow absolute -bottom-24 left-1/3 w-56 h-56 rounded-full bg-blue-500/15 blur-[85px] pointer-events-none" style={{ animation: 'cpAuthDrift 12s ease-in-out infinite' }} />
+            <button aria-label="Back" onClick={() => setScreen('welcome')} className="relative z-10 self-start p-2 -ml-2 text-slate-300"><ChevronLeft /></button>
+            <div className="relative z-10 my-auto text-center">
+              <div className="relative w-20 h-20 mx-auto rounded-3xl bg-amber-400 text-[#1a1300] flex items-center justify-center text-3xl font-black mb-6 shadow-[0_0_34px_rgba(59,130,246,.24)]">CP</div>
               <h2 className="text-2xl font-extrabold">Join Caspian Pal</h2>
               <p className="text-sm text-slate-400 mt-2">Create an account or log in to continue.</p>
             </div>
-            <div className="space-y-3">
+            <div className="relative z-10 space-y-3">
               <button className={primaryBtn} onClick={startSignup}>Create account</button>
               <button className={ghostBtn} onClick={() => { setLoginMode('email'); setLoginErr(''); setScreen('login'); }}>Log in</button>
               <div className="flex items-center gap-3 py-1"><div className="flex-1 h-px bg-[#222736]" /><span className="text-xs text-slate-500">or</span><div className="flex-1 h-px bg-[#222736]" /></div>
