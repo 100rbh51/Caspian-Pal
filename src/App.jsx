@@ -151,6 +151,7 @@ const [searchBusy, setSearchBusy] = useState(false);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [profileHelpOpen, setProfileHelpOpen] = useState(false);
   const [profileDraft, setProfileDraft] = useState({ name: '', username: '', bio: '' });
+  const [profileView, setProfileView] = useState('posts');
   const chatEnd = useRef(null);
 
   const showToast = (text, type = 'ok') => {
@@ -259,6 +260,7 @@ useEffect(() => {
     email: u.email || '',
     phone: u.phone ? '+' + u.phone.replace('+', '') : '',
     username: u.user_metadata?.username || (u.email ? u.email.split('@')[0] : 'user_' + (u.phone || '0000').slice(-4)),
+    avatar: u.user_metadata?.avatar_url || u.user_metadata?.picture || '',
     bio: u.user_metadata?.bio || '',
     dob: u.user_metadata?.dob || 'Not set'
   });
@@ -952,29 +954,37 @@ useEffect(() => {
               )}
 
               {tab === 'profile' && (
-                <div className="p-4 space-y-5">
+                <div className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-lg">Profile</h3>
+                    <div><h3 className="font-bold text-lg">@{currentUser?.username}</h3><p className="text-[11px] text-slate-500">Travel profile</p></div>
                     <button aria-label="Open profile menu" onClick={() => setProfileMenuOpen(true)} className="w-10 h-10 rounded-xl bg-[#171a24] border border-[#262b3a] flex items-center justify-center text-slate-200"><Menu size={20} /></button>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 shrink-0 rounded-full bg-gradient-to-br from-sky-400 via-indigo-500 to-violet-500 p-[2px] shadow-[0_0_25px_rgba(99,102,241,.28)]"><div className="w-full h-full rounded-full bg-[#11141d] flex items-center justify-center text-2xl font-black">{initial}</div></div>
-                    <div className="flex-1 grid grid-cols-2 gap-2 text-center">
-                      <div><p className="text-xl font-extrabold">{activities.filter((activity) => activity.author === currentUser?.name).length}</p><p className="text-xs text-slate-400">travel posts</p></div>
+                    <div className="w-20 h-20 shrink-0 rounded-full bg-gradient-to-br from-sky-400 via-indigo-500 to-violet-500 p-[2px] shadow-[0_0_25px_rgba(99,102,241,.28)]"><div className="relative w-full h-full rounded-full bg-[#11141d] overflow-hidden flex items-center justify-center text-2xl font-black">{initial}{currentUser?.avatar && <img src={currentUser.avatar} alt="Profile" className="absolute inset-0 w-full h-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}</div></div>
+                    <div className="flex-1 grid grid-cols-2 gap-1 text-center">
+                      <div><p className="text-xl font-extrabold">{activities.filter((activity) => activity.author === currentUser?.name).length}</p><p className="text-xs text-slate-400">posts</p></div>
                       <div><p className="text-xl font-extrabold">{joined.length}</p><p className="text-xs text-slate-400">trips joined</p></div>
                     </div>
                   </div>
-                  <div><h4 className="font-bold">{currentUser?.name}</h4><p className="text-sm text-teal-300 font-semibold">@{currentUser?.username}</p><p className="text-sm text-slate-300 mt-2 whitespace-pre-wrap">{currentUser?.bio || 'Add a short bio about your travel style and the trips you love.'}</p></div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => { setProfileDraft({ name: currentUser?.name || '', username: currentUser?.username || '', bio: currentUser?.bio || '' }); setProfileEditOpen(true); }} className="h-11 rounded-xl bg-[#252a35] font-semibold flex items-center justify-center gap-2"><Pencil size={16} />Edit profile</button>
-                    <button onClick={shareProfile} className="h-11 rounded-xl bg-[#252a35] font-semibold flex items-center justify-center gap-2"><Share2 size={16} />Share profile</button>
+                  <div><h4 className="font-bold">{currentUser?.name}</h4><p className="text-sm text-slate-300 mt-1 whitespace-pre-wrap">{currentUser?.bio || 'Add a short bio about your travel style and the trips you love.'}</p></div>
+                  <div className="grid grid-cols-[1fr_1fr_44px] gap-2">
+                    <button onClick={() => { setProfileDraft({ name: currentUser?.name || '', username: currentUser?.username || '', bio: currentUser?.bio || '' }); setProfileEditOpen(true); }} className="h-11 rounded-xl bg-[#252a35] text-sm font-semibold flex items-center justify-center gap-2"><Pencil size={15} />Edit profile</button>
+                    <button onClick={shareProfile} className="h-11 rounded-xl bg-[#252a35] text-sm font-semibold flex items-center justify-center gap-2"><Share2 size={15} />Share profile</button>
+                    <button aria-label="Find travel companions" onClick={() => setTab('search')} className="h-11 rounded-xl bg-[#252a35] flex items-center justify-center"><Users size={18} /></button>
                   </div>
-                  <div className="border-t border-[#222736] pt-4">
-                    <div className="flex items-center gap-2 mb-3"><Grid3X3 size={17} className="text-amber-300" /><h4 className="font-bold text-sm">My travel posts</h4></div>
-                    {activities.filter((activity) => activity.author === currentUser?.name).length ? <div className="space-y-3">{activities.filter((activity) => activity.author === currentUser?.name).map((activity) => <ActivityCard key={activity.id} a={activity} />)}</div> : (
-                      <div className="rounded-2xl border border-dashed border-[#303648] p-5 text-center"><Plane size={25} className="mx-auto mb-2 text-slate-500" /><p className="text-sm text-slate-400">Your travel posts will appear here.</p><button onClick={() => setShowCreate(true)} className="mt-3 h-10 px-4 rounded-xl bg-amber-400 text-[#1a1300] text-sm font-bold">Create travel post</button></div>
-                    )}
+                  <div className="border-t border-[#222736] pt-3">
+                    <div className="flex items-center justify-between mb-3"><h4 className="font-bold text-sm">Trip highlights</h4><button onClick={() => setShowCreate(true)} className="text-xs text-sky-300 font-semibold">+ Add trip</button></div>
+                    <div className="flex gap-4 overflow-x-auto pb-2">
+                      <button onClick={() => setShowCreate(true)} className="shrink-0 flex flex-col items-center gap-1.5"><span className="w-14 h-14 rounded-full border border-dashed border-slate-500 flex items-center justify-center text-2xl text-slate-300">+</span><span className="text-[11px] text-slate-400">New trip</span></button>
+                      {activities.filter((activity) => joined.includes(activity.id)).map((activity) => <button key={activity.id} onClick={() => setProfileView('joined')} className="shrink-0 w-16 flex flex-col items-center gap-1.5"><span className="w-14 h-14 rounded-full bg-gradient-to-br from-sky-400 via-indigo-500 to-violet-500 p-[2px]"><span className="w-full h-full rounded-full bg-[#11141d] flex items-center justify-center"><Plane size={19} className="text-sky-300" /></span></span><span className="w-full text-[11px] text-slate-400 truncate">{activity.venue || activity.title}</span></button>)}
+                    </div>
                   </div>
+                  <div className="grid grid-cols-2 border-y border-[#222736]">
+                    <button onClick={() => setProfileView('posts')} className={'h-11 flex items-center justify-center gap-2 border-b-2 ' + (profileView === 'posts' ? 'border-amber-300 text-amber-300' : 'border-transparent text-slate-500')}><Grid3X3 size={17} /><span className="text-xs font-semibold">Posts</span></button>
+                    <button onClick={() => setProfileView('joined')} className={'h-11 flex items-center justify-center gap-2 border-b-2 ' + (profileView === 'joined' ? 'border-amber-300 text-amber-300' : 'border-transparent text-slate-500')}><Plane size={17} /><span className="text-xs font-semibold">Trips joined</span></button>
+                  </div>
+                  {profileView === 'posts' && (activities.filter((activity) => activity.author === currentUser?.name).length ? <div className="space-y-3">{activities.filter((activity) => activity.author === currentUser?.name).map((activity) => <ActivityCard key={activity.id} a={activity} />)}</div> : <div className="rounded-2xl border border-dashed border-[#303648] p-5 text-center"><Plane size={25} className="mx-auto mb-2 text-slate-500" /><p className="text-sm text-slate-400">Your travel posts will appear here.</p><button onClick={() => setShowCreate(true)} className="mt-3 h-10 px-4 rounded-xl bg-amber-400 text-[#1a1300] text-sm font-bold">Create travel post</button></div>)}
+                  {profileView === 'joined' && (activities.filter((activity) => joined.includes(activity.id)).length ? <div className="space-y-3">{activities.filter((activity) => joined.includes(activity.id)).map((activity) => <ActivityCard key={activity.id} a={activity} />)}</div> : <div className="rounded-2xl border border-dashed border-[#303648] p-5 text-center"><Compass size={25} className="mx-auto mb-2 text-slate-500" /><p className="text-sm text-slate-400">Trips you join will appear here.</p><button onClick={() => { setTab('home'); setCategory('All'); }} className="mt-3 h-10 px-4 rounded-xl bg-amber-400 text-[#1a1300] text-sm font-bold">Explore trips</button></div>)}
                 </div>
               )}
             </main>
