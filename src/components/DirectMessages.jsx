@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { ChevronLeft, MessageSquare, Phone, Plane, Search, Send, UserPlus, Video, X } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Phone, Plane, Search, Send, UserPlus, Video } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const inputClass = 'w-full h-11 px-4 rounded-xl bg-[#171a24] border border-[#262b3a] text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-sky-400';
@@ -145,6 +145,8 @@ export default function DirectMessages({ currentUser, showToast }) {
     const channel = supabase.channel('incoming-calls-' + currentUser.id)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'call_rooms', filter: 'callee_id=eq.' + currentUser.id },
         (payload) => { if (live && payload.new.status === 'ringing') setIncomingCall(payload.new); })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'call_rooms', filter: 'callee_id=eq.' + currentUser.id },
+        (payload) => { if (live && ['ended', 'rejected'].includes(payload.new.status)) setIncomingCall((old) => old?.id === payload.new.id ? null : old); })
       .subscribe();
     return () => { live = false; supabase.removeChannel(channel); };
   }, [currentUser?.id]);
