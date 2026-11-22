@@ -60,8 +60,8 @@ create policy "Friends can read direct messages"
     and exists (
       select 1 from public.friend_requests fr
       where fr.status = 'accepted'
-        and ((fr.sender_id = sender_id and fr.recipient_id = recipient_id)
-          or (fr.sender_id = recipient_id and fr.recipient_id = sender_id))
+        and ((fr.sender_id = direct_messages.sender_id and fr.recipient_id = direct_messages.recipient_id)
+          or (fr.sender_id = direct_messages.recipient_id and fr.recipient_id = direct_messages.sender_id))
     )
   );
 drop policy if exists "Friends can send direct messages" on public.direct_messages;
@@ -73,8 +73,8 @@ create policy "Friends can send direct messages"
     and exists (
       select 1 from public.friend_requests fr
       where fr.status = 'accepted'
-        and ((fr.sender_id = sender_id and fr.recipient_id = recipient_id)
-          or (fr.sender_id = recipient_id and fr.recipient_id = sender_id))
+        and ((fr.sender_id = direct_messages.sender_id and fr.recipient_id = direct_messages.recipient_id)
+          or (fr.sender_id = direct_messages.recipient_id and fr.recipient_id = direct_messages.sender_id))
     )
   );
 grant select, insert on public.direct_messages to authenticated;
@@ -108,8 +108,8 @@ create policy "Friends can start calls"
     and exists (
       select 1 from public.friend_requests fr
       where fr.status = 'accepted'
-        and ((fr.sender_id = caller_id and fr.recipient_id = callee_id)
-          or (fr.sender_id = callee_id and fr.recipient_id = caller_id))
+        and ((fr.sender_id = call_rooms.caller_id and fr.recipient_id = call_rooms.callee_id)
+          or (fr.sender_id = call_rooms.callee_id and fr.recipient_id = call_rooms.caller_id))
     )
   );
 drop policy if exists "Callee can answer or reject calls" on public.call_rooms;
