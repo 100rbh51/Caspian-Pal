@@ -1,10 +1,11 @@
 import Reels from './components/Reels';
+import DirectMessages from './components/DirectMessages';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, Eye, EyeOff, Home, MessageSquare, User, Video, Search,
   Plus, Send, MapPin, Users, Compass, LogOut, X, Mail, Menu, Share2, Plane,
   ShieldCheck, Pencil, Grid3X3,
-  AtSign, PhoneOff, RefreshCw, CheckCircle2, AlertCircle
+  AtSign, RefreshCw, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { supabase } from './supabase';
 import { Capacitor } from '@capacitor/core';
@@ -141,18 +142,11 @@ const [searchBusy, setSearchBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [draft, setDraft] = useState({ category: 'Study', section: 'school', title: '', venue: '', desc: '' });
   const [draftErr, setDraftErr] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatBusy, setChatBusy] = useState(false);
-  const [chatError, setChatError] = useState('');
-  const [inputMessage, setInputMessage] = useState('');
-  const [inCall, setInCall] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [profileHelpOpen, setProfileHelpOpen] = useState(false);
   const [profileDraft, setProfileDraft] = useState({ name: '', username: '', bio: '' });
   const [profileView, setProfileView] = useState('posts');
-  const chatEnd = useRef(null);
 
   const showToast = (text, type = 'ok') => {
     setToast({ text, type });
@@ -165,57 +159,6 @@ const [searchBusy, setSearchBusy] = useState(false);
     return () => clearTimeout(t);
   }, [resend]);
 
-  useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, tab]);
-
-  useEffect(() => {
-    if (screen !== 'dashboard' || tab !== 'message' || !currentUser?.id) return;
-
-    let active = true;
-    setChatLoading(true);
-    setChatError('');
-
-    const loadMessages = async () => {
-      const { data, error } = await supabase
-        .from('community_messages')
-        .select('id, user_id, sender_name, body, created_at')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (!active) return;
-      setChatLoading(false);
-      if (error) {
-        console.error('Community chat load error:', error.message);
-        setChatError('Messages load nahi hue. Supabase table setup check karein.');
-        return;
-      }
-      setMessages((data || []).reverse());
-    };
-
-    loadMessages();
-
-    const channel = supabase
-      .channel('community-messages-live')
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'community_messages',
-      }, (payload) => {
-        if (!active) return;
-        setMessages((previous) => {
-          if (previous.some((message) => message.id === payload.new.id)) return previous;
-          return [...previous, payload.new];
-        });
-      })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('Community chat realtime status:', status);
-          if (active) setChatError('Live updates connect nahi hue. Supabase Realtime setup check karein.');
-        }
-      });
-
-    return () => {
-      active = false;
-      supabase.removeChannel(channel);
-    };
-  }, [screen, tab, currentUser?.id]);
 useEffect(() => {
   const term = query.trim().replace(/^@/, '');
 
@@ -504,35 +447,6 @@ useEffect(() => {
     setDraft({ category: 'Study', section: 'school', title: '', venue: '', desc: '' });
     setDraftErr(''); setShowCreate(false); setCategory('All'); setTab('home');
     showToast('Activity published.');
-  };
-
-  const send = async () => {
-    const body = inputMessage.trim();
-    if (!body || chatBusy || !currentUser?.id) return;
-    if (body.length > 2000) {
-      showToast('Message 2000 characters se chhota rakhein.', 'err');
-      return;
-    }
-
-    setChatBusy(true);
-    setChatError('');
-    const { data, error } = await supabase
-      .from('community_messages')
-      .insert({ user_id: currentUser.id, sender_name: currentUser.name || 'Member', body })
-      .select('id, user_id, sender_name, body, created_at')
-      .single();
-    setChatBusy(false);
-
-    if (error) {
-      console.error('Community chat send error:', error.message);
-      setChatError('Message send nahi hua. Table/policy setup check karein.');
-      return;
-    }
-
-    setMessages((previous) => previous.some((message) => message.id === data.id)
-      ? previous
-      : [...previous, data]);
-    setInputMessage('');
   };
 
   const toggleJoin = (a) => {
@@ -878,44 +792,7 @@ useEffect(() => {
 
              {tab === 'reels' && <Reels />}
 
-              {tab === 'message' && (
-                <div className="flex flex-col h-full">
-                  <div className="px-4 py-3 border-b border-[#1c2030] flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-sm">Community chat</h4>
-                      <p className="text-xs text-teal-300">Shared chat · Live updates</p>
-                    </div>
-                    <button aria-label="Start video call" onClick={() => setInCall(true)} className="w-10 h-10 rounded-full bg-[#171a24] text-teal-300 flex items-center justify-center"><Video size={18} /></button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-                    {chatLoading && <p className="text-center text-sm text-slate-400 py-4">Loading messages...</p>}
-                    {!chatLoading && messages.length === 0 && !chatError && (
-                      <p className="text-center text-sm text-slate-400 py-8">Abhi koi message nahi. Pehla message aap bhejein!</p>
-                    )}
-                    {messages.map((m) => {
-                      const mine = m.user_id === currentUser?.id;
-                      const time = m.created_at
-                        ? new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                        : '';
-                      return (
-                        <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                          <div className="max-w-[78%]">
-                            <div className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed ${mine ? 'bg-amber-400 text-[#1a1300] rounded-br-md' : 'bg-[#1a1e2b] text-slate-100 rounded-bl-md'}`}>{m.body}</div>
-                            <p className={`text-[10px] text-slate-500 mt-1 ${mine ? 'text-right' : ''}`}>{mine ? 'You' : m.sender_name} · {time}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {chatError && <p role="alert" className="text-center text-xs text-rose-300 py-2">{chatError}</p>}
-                    <div ref={chatEnd} />
-                  </div>
-                  <div className="p-3 border-t border-[#1c2030] flex gap-2">
-                    <input value={inputMessage} maxLength={2000} onChange={(e) => setInputMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
-                      placeholder="Write a message" className={inputCls + ' h-11 text-sm'} />
-                    <button aria-label="Send" onClick={send} disabled={chatBusy || !inputMessage.trim()} className="w-11 h-11 shrink-0 rounded-xl bg-amber-400 text-[#1a1300] flex items-center justify-center disabled:opacity-50"><Send size={17} /></button>
-                  </div>
-                </div>
-              )}
+              {tab === 'message' && <DirectMessages currentUser={currentUser} showToast={showToast} />}
 
               {tab === 'search' && (
                 <div className="p-4 space-y-4">
@@ -1059,17 +936,6 @@ useEffect(() => {
           </div>
         )}
 
-        {/* CALL */}
-        {inCall && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-between p-8" style={{ background: 'radial-gradient(100% 50% at 50% 20%, #1f2a2a 0%, #07080c 70%)' }}>
-            <div className="pt-24 text-center space-y-3">
-              <div className="w-24 h-24 mx-auto bg-amber-400 text-[#1a1300] rounded-full flex items-center justify-center text-3xl font-black">CP</div>
-              <h2 className="text-xl font-bold">Caspian Pal</h2>
-              <p className="text-sm text-teal-300">Demo call screen</p>
-            </div>
-            <button aria-label="End call" onClick={() => setInCall(false)} className="w-16 h-16 rounded-full bg-rose-500 flex items-center justify-center mb-6"><PhoneOff size={26} /></button>
-          </div>
-        )}
       </div>
     </div>
   );
