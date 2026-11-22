@@ -208,7 +208,7 @@ export default function DirectMessages({ currentUser, showToast }) {
     if (!isFriend) { showToast('Call ke liye pehle friend request accept honi chahiye.', 'err'); return; }
     const roomName = 'caspian-' + crypto.randomUUID();
     const { data, error: callError } = await supabase.from('call_rooms')
-      .insert({ caller_id: currentUser.id, callee_id: activeFriend.id, call_type: kind, room_name: roomName })
+      .insert({ caller_id: currentUser.id, callee_id: activeFriend.id, created_by: currentUser.id, call_type: kind, room_name: roomName })
       .select('*').single();
     if (callError) { showToast(callError.message, 'err'); return; }
     setActiveCall(data);
