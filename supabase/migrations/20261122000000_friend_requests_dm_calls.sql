@@ -96,13 +96,13 @@ create table if not exists public.call_rooms (
 alter table public.call_rooms add column if not exists caller_id uuid references auth.users(id) on delete cascade;
 alter table public.call_rooms add column if not exists callee_id uuid references auth.users(id) on delete cascade;
 alter table public.call_rooms add column if not exists created_by uuid references auth.users(id) on delete cascade;
-do $
+do $migration$
 begin
   if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'call_rooms' and column_name = 'created_by') then
     execute 'update public.call_rooms set caller_id = coalesce(caller_id, created_by) where caller_id is null';
   end if;
 end
-$;
+$migration$;
 
 create index if not exists call_rooms_callee_status_idx
   on public.call_rooms (callee_id, status, created_at desc);
