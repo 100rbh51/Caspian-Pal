@@ -150,7 +150,7 @@ const [searchBusy, setSearchBusy] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileEditOpen, setProfileEditOpen] = useState(false);
   const [profileHelpOpen, setProfileHelpOpen] = useState(false);
-  const [profileDraft, setProfileDraft] = useState({ name: '', username: '' });
+  const [profileDraft, setProfileDraft] = useState({ name: '', username: '', bio: '' });
   const chatEnd = useRef(null);
 
   const showToast = (text, type = 'ok') => {
@@ -259,6 +259,7 @@ useEffect(() => {
     email: u.email || '',
     phone: u.phone ? '+' + u.phone.replace('+', '') : '',
     username: u.user_metadata?.username || (u.email ? u.email.split('@')[0] : 'user_' + (u.phone || '0000').slice(-4)),
+    bio: u.user_metadata?.bio || '',
     dob: u.user_metadata?.dob || 'Not set'
   });
 
@@ -442,10 +443,11 @@ useEffect(() => {
   const saveProfile = async () => {
     const name = profileDraft.name.trim();
     const username = profileDraft.username.trim().toLowerCase();
+    const bio = profileDraft.bio.trim().slice(0, 160);
     if (name.length < 2) { showToast('Name kam se kam 2 characters ka ho.', 'err'); return; }
     if (!/^[a-z0-9_]{3,20}$/.test(username)) { showToast('Username 3–20 letters, numbers ya underscore ka hona chahiye.', 'err'); return; }
     setBusy(true);
-    const { data, error } = await supabase.auth.updateUser({ data: { name, username } });
+    const { data, error } = await supabase.auth.updateUser({ data: { name, username, bio } });
     setBusy(false);
     if (error) { showToast(error.message, 'err'); return; }
     setCurrentUser(toUser(data.user));
@@ -962,9 +964,9 @@ useEffect(() => {
                       <div><p className="text-xl font-extrabold">{joined.length}</p><p className="text-xs text-slate-400">trips joined</p></div>
                     </div>
                   </div>
-                  <div><h4 className="font-bold">{currentUser?.name}</h4><p className="text-sm text-teal-300 font-semibold">@{currentUser?.username}</p><p className="text-sm text-slate-400 mt-2">Meet travel companions and plan your next journey.</p></div>
+                  <div><h4 className="font-bold">{currentUser?.name}</h4><p className="text-sm text-teal-300 font-semibold">@{currentUser?.username}</p><p className="text-sm text-slate-300 mt-2 whitespace-pre-wrap">{currentUser?.bio || 'Add a short bio about your travel style and the trips you love.'}</p></div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => { setProfileDraft({ name: currentUser?.name || '', username: currentUser?.username || '' }); setProfileEditOpen(true); }} className="h-11 rounded-xl bg-[#252a35] font-semibold flex items-center justify-center gap-2"><Pencil size={16} />Edit profile</button>
+                    <button onClick={() => { setProfileDraft({ name: currentUser?.name || '', username: currentUser?.username || '', bio: currentUser?.bio || '' }); setProfileEditOpen(true); }} className="h-11 rounded-xl bg-[#252a35] font-semibold flex items-center justify-center gap-2"><Pencil size={16} />Edit profile</button>
                     <button onClick={shareProfile} className="h-11 rounded-xl bg-[#252a35] font-semibold flex items-center justify-center gap-2"><Share2 size={16} />Share profile</button>
                   </div>
                   <div className="border-t border-[#222736] pt-4">
@@ -1008,6 +1010,7 @@ useEffect(() => {
             <div className="flex items-center justify-between"><h3 className="font-bold text-lg">Edit travel profile</h3><button aria-label="Close" onClick={() => setProfileEditOpen(false)}><X size={20} /></button></div>
             <Field label="Name"><input className={inputCls} value={profileDraft.name} onChange={(event) => setProfileDraft({ ...profileDraft, name: event.target.value })} maxLength={60} /></Field>
             <Field label="Username" hint="3–20 lowercase letters, numbers or underscores."><div className="relative"><AtSign size={17} className="absolute left-4 top-4 text-slate-500" /><input className={inputCls + ' pl-10'} value={profileDraft.username} onChange={(event) => setProfileDraft({ ...profileDraft, username: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })} maxLength={20} /></div></Field>
+            <Field label="Bio" hint={profileDraft.bio.length + '/160'}><textarea className={inputCls + ' h-24 py-3 resize-none'} placeholder="Tell travelers what kind of trips you enjoy…" value={profileDraft.bio} onChange={(event) => setProfileDraft({ ...profileDraft, bio: event.target.value.slice(0, 160) })} maxLength={160} /></Field>
             <button className={primaryBtn} onClick={saveProfile} disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</button>
           </div></div>
         )}
