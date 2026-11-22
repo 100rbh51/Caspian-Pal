@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { AtSign, Check, ChevronLeft, MessageSquare, Phone, Plane, Search, Send, UserPlus, Video, X } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Phone, Plane, Search, Send, UserPlus, Video, X } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const inputClass = 'w-full h-11 px-4 rounded-xl bg-[#171a24] border border-[#262b3a] text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-sky-400';
@@ -261,6 +261,8 @@ export default function DirectMessages({ currentUser, showToast }) {
       {error && <p role="alert" className="text-center text-xs text-rose-300 py-2">{error}</p>}
     </div>
     <div className="p-3 border-t border-[#1c2030] flex gap-2"><input value={draft} maxLength={2000} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && !event.shiftKey && (event.preventDefault(), sendMessage())} placeholder="Message your travel friend…" className={inputClass}/><button aria-label="Send message" onClick={sendMessage} disabled={busy || !draft.trim()} className="w-11 h-11 shrink-0 rounded-xl bg-amber-400 text-[#1a1300] flex items-center justify-center disabled:opacity-40"><Send size={17}/></button></div>
+    {incomingCall && <div className="absolute inset-0 z-[60] bg-black/70 flex items-center justify-center p-5"><div className="w-full rounded-3xl bg-[#13161f] border border-[#303648] p-5 text-center space-y-4"><div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-sky-400 to-violet-500 flex items-center justify-center text-xl font-bold">{(people[incomingCall.caller_id]?.full_name || 'T').slice(0,1).toUpperCase()}</div><h3 className="font-bold">{people[incomingCall.caller_id]?.full_name || 'Your travel friend'} is calling</h3><p className="text-sm text-slate-400">{incomingCall.call_type === 'video' ? 'Video' : 'Voice'} call</p><div className="flex gap-3"><button onClick={declineCall} className="flex-1 h-11 rounded-xl bg-rose-500 font-bold">Decline</button><button onClick={acceptCall} className="flex-1 h-11 rounded-xl bg-emerald-500 text-black font-bold">Accept</button></div></div></div>}
+    {activeCall && <CallOverlay call={activeCall} onEnd={endCall}/>}
   </div>;
 
   return <div className="flex flex-col h-full min-h-0">
