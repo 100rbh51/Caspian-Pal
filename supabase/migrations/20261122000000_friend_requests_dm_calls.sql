@@ -118,10 +118,11 @@ create policy "Callee can answer or reject calls"
   using (callee_id = auth.uid() and status = 'ringing')
   with check (callee_id = auth.uid() and status in ('active', 'rejected'));
 drop policy if exists "Caller can end calls" on public.call_rooms;
-create policy "Caller can end calls"
+drop policy if exists "Participants can end calls" on public.call_rooms;
+create policy "Participants can end calls"
   on public.call_rooms for update to authenticated
-  using (caller_id = auth.uid() and status in ('ringing', 'active'))
-  with check (caller_id = auth.uid() and status = 'ended');
+  using ((caller_id = auth.uid() or callee_id = auth.uid()) and status in ('ringing', 'active'))
+  with check ((caller_id = auth.uid() or callee_id = auth.uid()) and status = 'ended');
 grant select, insert, update on public.call_rooms to authenticated;
 
 do $$
