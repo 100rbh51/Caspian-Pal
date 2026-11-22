@@ -1,8 +1,9 @@
 import Reels from './components/Reels';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronLeft, Eye, EyeOff, Home, MessageSquare, User, Video, Search,
-  Plus, Send, MapPin, Users, Compass, LogOut, X, Mail,
+  ChevronLeft, ChevronRight, Eye, EyeOff, Home, MessageSquare, User, Video, Search,
+  Plus, Send, MapPin, Users, Compass, LogOut, X, Mail, Menu, Share2, Plane,
+  ShieldCheck, Pencil, Grid3X3,
   AtSign, PhoneOff, RefreshCw, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { supabase } from './supabase';
@@ -146,6 +147,10 @@ const [searchBusy, setSearchBusy] = useState(false);
   const [chatError, setChatError] = useState('');
   const [inputMessage, setInputMessage] = useState('');
   const [inCall, setInCall] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [profileHelpOpen, setProfileHelpOpen] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({ name: '', username: '' });
   const chatEnd = useRef(null);
 
   const showToast = (text, type = 'ok') => {
@@ -432,6 +437,41 @@ useEffect(() => {
   const logout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(null); setLoginId(''); setLoginPw(''); setTab('home'); setScreen('welcome');
+  };
+
+  const saveProfile = async () => {
+    const name = profileDraft.name.trim();
+    const username = profileDraft.username.trim().toLowerCase();
+    if (name.length < 2) { showToast('Name kam se kam 2 characters ka ho.', 'err'); return; }
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) { showToast('Username 3–20 letters, numbers ya underscore ka hona chahiye.', 'err'); return; }
+    setBusy(true);
+    const { data, error } = await supabase.auth.updateUser({ data: { name, username } });
+    setBusy(false);
+    if (error) { showToast(error.message, 'err'); return; }
+    setCurrentUser(toUser(data.user));
+    setProfileEditOpen(false);
+    showToast('Travel profile updated.');
+  };
+
+  const shareProfile = async () => {
+    const text = 'Caspian Pal travel profile: @' + (currentUser?.username || 'traveler');
+    try {
+      if (navigator.share) await navigator.share({ title: 'Caspian Pal', text });
+      else if (navigator.clipboard) { await navigator.clipboard.writeText(text); showToast('Profile name copied to clipboard.'); }
+      else showToast(text);
+    } catch (error) {
+      if (error?.name !== 'AbortError') showToast('Profile share nahi ho saka.', 'err');
+    }
+  };
+
+  const chooseProfileMenuItem = (action) => {
+    setProfileMenuOpen(false);
+    if (action === 'create') setShowCreate(true);
+    if (action === 'explore') { setTab('home'); setCategory('All'); }
+    if (action === 'reels') setTab('reels');
+    if (action === 'messages') setTab('message');
+    if (action === 'help') setProfileHelpOpen(true);
+    if (action === 'logout') logout();
   };
 
   /* data */
@@ -910,20 +950,29 @@ useEffect(() => {
               )}
 
               {tab === 'profile' && (
-                <div className="p-4 space-y-4">
-                  <div className="rounded-2xl bg-[#13161f] border border-[#222736] p-6 text-center space-y-3">
-                    <div className="w-20 h-20 mx-auto rounded-full bg-amber-400 text-[#1a1300] flex items-center justify-center text-3xl font-bold">{initial}</div>
-                    <div>
-                      <h3 className="font-bold text-lg">{currentUser?.name}</h3>
-                      <p className="text-sm text-teal-300 font-semibold">@{currentUser?.username}</p>
-                    </div>
-                    <div className="text-left text-sm space-y-2 pt-2">
-                      <div className="flex justify-between border-t border-[#222736] pt-3"><span className="text-slate-500">{currentUser?.email ? 'Email' : 'Phone'}</span><span>{currentUser?.email || currentUser?.phone}</span></div>
-                      <div className="flex justify-between border-t border-[#222736] pt-3"><span className="text-slate-500">Birthday</span><span>{currentUser?.dob}</span></div>
-                      <div className="flex justify-between border-t border-[#222736] pt-3"><span className="text-slate-500">Activities joined</span><span>{joined.length}</span></div>
+                <div className="p-4 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-lg">Profile</h3>
+                    <button aria-label="Open profile menu" onClick={() => setProfileMenuOpen(true)} className="w-10 h-10 rounded-xl bg-[#171a24] border border-[#262b3a] flex items-center justify-center text-slate-200"><Menu size={20} /></button>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="w-20 h-20 shrink-0 rounded-full bg-gradient-to-br from-sky-400 via-indigo-500 to-violet-500 p-[2px] shadow-[0_0_25px_rgba(99,102,241,.28)]"><div className="w-full h-full rounded-full bg-[#11141d] flex items-center justify-center text-2xl font-black">{initial}</div></div>
+                    <div className="flex-1 grid grid-cols-2 gap-2 text-center">
+                      <div><p className="text-xl font-extrabold">{activities.filter((activity) => activity.author === currentUser?.name).length}</p><p className="text-xs text-slate-400">travel posts</p></div>
+                      <div><p className="text-xl font-extrabold">{joined.length}</p><p className="text-xs text-slate-400">trips joined</p></div>
                     </div>
                   </div>
-                  <button onClick={logout} className="w-full h-12 rounded-xl bg-rose-500/10 text-rose-300 font-bold flex items-center justify-center gap-2"><LogOut size={17} />Log out</button>
+                  <div><h4 className="font-bold">{currentUser?.name}</h4><p className="text-sm text-teal-300 font-semibold">@{currentUser?.username}</p><p className="text-sm text-slate-400 mt-2">Meet travel companions and plan your next journey.</p></div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => { setProfileDraft({ name: currentUser?.name || '', username: currentUser?.username || '' }); setProfileEditOpen(true); }} className="h-11 rounded-xl bg-[#252a35] font-semibold flex items-center justify-center gap-2"><Pencil size={16} />Edit profile</button>
+                    <button onClick={shareProfile} className="h-11 rounded-xl bg-[#252a35] font-semibold flex items-center justify-center gap-2"><Share2 size={16} />Share profile</button>
+                  </div>
+                  <div className="border-t border-[#222736] pt-4">
+                    <div className="flex items-center gap-2 mb-3"><Grid3X3 size={17} className="text-amber-300" /><h4 className="font-bold text-sm">My travel posts</h4></div>
+                    {activities.filter((activity) => activity.author === currentUser?.name).length ? <div className="space-y-3">{activities.filter((activity) => activity.author === currentUser?.name).map((activity) => <ActivityCard key={activity.id} a={activity} />)}</div> : (
+                      <div className="rounded-2xl border border-dashed border-[#303648] p-5 text-center"><Plane size={25} className="mx-auto mb-2 text-slate-500" /><p className="text-sm text-slate-400">Your travel posts will appear here.</p><button onClick={() => setShowCreate(true)} className="mt-3 h-10 px-4 rounded-xl bg-amber-400 text-[#1a1300] text-sm font-bold">Create travel post</button></div>
+                    )}
+                  </div>
                 </div>
               )}
             </main>
@@ -936,6 +985,40 @@ useEffect(() => {
               ))}
             </nav>
           </div>
+        )}
+
+        {profileMenuOpen && (
+          <div className="absolute inset-0 z-40 bg-black/65 flex items-end" onClick={() => setProfileMenuOpen(false)}>
+            <div className="w-full rounded-t-3xl border-t border-[#303648] bg-[#11141d] p-5 pb-8 space-y-4 max-h-[82%] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+              <div className="w-10 h-1 rounded-full bg-slate-600 mx-auto" />
+              <div><h3 className="font-bold text-lg">Caspian Pal</h3><p className="text-xs text-slate-400">Travel profile · @{currentUser?.username}</p></div>
+              <div className="space-y-1"><p className="px-2 pb-1 text-[11px] uppercase tracking-wider text-slate-500">Your travel</p>
+                {[['create', 'Create travel post', Plus], ['explore', 'Explore activities', Compass], ['reels', 'Travel Reels', Video], ['messages', 'Messages', MessageSquare]].map(([action, label, Icon]) => <button key={action} onClick={() => chooseProfileMenuItem(action)} className="w-full min-h-12 px-3 rounded-xl flex items-center gap-3 text-left hover:bg-[#1b2030]"><Icon size={18} className="text-sky-300" /><span className="flex-1 text-sm font-medium">{label}</span><ChevronRight size={16} className="text-slate-500" /></button>)}
+              </div>
+              <div className="space-y-1 border-t border-[#252a35] pt-3"><p className="px-2 pb-1 text-[11px] uppercase tracking-wider text-slate-500">Account & support</p>
+                <button onClick={() => { setProfileMenuOpen(false); setProfileHelpOpen(true); }} className="w-full min-h-12 px-3 rounded-xl flex items-center gap-3 text-left hover:bg-[#1b2030]"><ShieldCheck size={18} className="text-teal-300" /><span className="flex-1 text-sm font-medium">Travel safety & help</span><ChevronRight size={16} className="text-slate-500" /></button>
+                <button onClick={() => chooseProfileMenuItem('logout')} className="w-full min-h-12 px-3 rounded-xl flex items-center gap-3 text-left hover:bg-rose-500/10 text-rose-300"><LogOut size={18} /><span className="flex-1 text-sm font-medium">Log out</span><ChevronRight size={16} className="text-rose-300/60" /></button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {profileEditOpen && (
+          <div className="absolute inset-0 z-50 bg-black/70 flex items-end" onClick={() => setProfileEditOpen(false)}><div className="w-full rounded-t-3xl border-t border-[#303648] bg-[#11141d] p-5 pb-8 space-y-4" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between"><h3 className="font-bold text-lg">Edit travel profile</h3><button aria-label="Close" onClick={() => setProfileEditOpen(false)}><X size={20} /></button></div>
+            <Field label="Name"><input className={inputCls} value={profileDraft.name} onChange={(event) => setProfileDraft({ ...profileDraft, name: event.target.value })} maxLength={60} /></Field>
+            <Field label="Username" hint="3–20 lowercase letters, numbers or underscores."><div className="relative"><AtSign size={17} className="absolute left-4 top-4 text-slate-500" /><input className={inputCls + ' pl-10'} value={profileDraft.username} onChange={(event) => setProfileDraft({ ...profileDraft, username: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })} maxLength={20} /></div></Field>
+            <button className={primaryBtn} onClick={saveProfile} disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</button>
+          </div></div>
+        )}
+
+        {profileHelpOpen && (
+          <div className="absolute inset-0 z-50 bg-black/70 flex items-end" onClick={() => setProfileHelpOpen(false)}><div className="w-full rounded-t-3xl border-t border-[#303648] bg-[#11141d] p-5 pb-8 space-y-4" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between"><h3 className="font-bold text-lg">Travel safety & help</h3><button aria-label="Close" onClick={() => setProfileHelpOpen(false)}><X size={20} /></button></div>
+            <p className="text-sm text-slate-300">Plan meetups in public places, verify travel details independently, and never share passwords or OTP codes.</p>
+            <p className="text-xs text-slate-500">Caspian Pal helps you discover travel companions. Confirm bookings, transport, and local guidance with trusted providers.</p>
+            <button className={ghostBtn} onClick={() => setProfileHelpOpen(false)}>Close</button>
+          </div></div>
         )}
 
         {/* CREATE MODAL */}
