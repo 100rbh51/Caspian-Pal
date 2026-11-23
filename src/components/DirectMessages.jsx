@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import MessagesInbox from './MessagesInbox';
 import { LiveKitRoom, RoomAudioRenderer, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { ChevronLeft, MessageSquare, Phone, Plane, Search, Send, UserPlus, Video } from 'lucide-react';
@@ -103,6 +104,31 @@ export default function DirectMessages({ currentUser, showToast }) {
     const id = request.sender_id === currentUser?.id ? request.recipient_id : request.sender_id;
     return people[id] ? { ...people[id], id } : { id, username: 'traveler', full_name: 'Caspian Pal member' };
   });
+
+  const [recentMessages, setRecentMessages] = useState({});
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let live = true;
+    const loadRecent = async () => {
+      const { data, error: recentError } = await supabase.from('direct_messages')
+        .select('id, sender_id, recipient_id, body, created_at')
+        .or('sender_id.eq.' + currentUser.id + ',recipient_id.eq.' + currentUser.id)
+        .order('created_at', { ascending: false }).limit(200);
+      if (!live) return;
+      if (recentError) { console.error('Inbox preview load error:', recentError.message); return; }
+      const latest = {};
+      for (const message of data || []) {
+        const friendId = message.sender_id === currentUser.id ? message.recipient_id : message.sender_id;
+        if (!latest[friendId]) latest[friendId] = message;
+      }
+      setRecentMessages(latest);
+    };
+    loadRecent();
+    const channel = supabase.channel('inbox-preview-' + currentUser.id)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, loadRecent)
+      .subscribe();
+    return () => { live = false; supabase.removeChannel(channel); };
+  }, [currentUser?.id, friends.map((friend) => friend.id).join('|')]);
 
   const relationship = (personId) => requests.find((request) =>
     (request.sender_id === currentUser?.id && request.recipient_id === personId) ||
@@ -267,21 +293,13 @@ export default function DirectMessages({ currentUser, showToast }) {
     {activeCall && <CallOverlay call={activeCall} onEnd={endCall}/>}
   </div>;
 
-  return <div className="flex flex-col h-full min-h-0">
-    <div className="p-4 border-b border-[#1c2030] space-y-3">
-      <div className="flex items-center justify-between"><div><h3 className="font-bold text-lg">Messages</h3><p className="text-xs text-slate-400">Friend request accept hone par private chat khulega.</p></div><MessageSquare size={20} className="text-sky-300"/></div>
-      <div className="relative"><Search size={17} className="absolute left-3.5 top-3.5 text-slate-500"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Username search karo" className={inputClass + ' pl-10'}/></div>
-    </div>
-    <div className="flex-1 overflow-y-auto p-4 space-y-5 min-h-0">
-      {searching && <p className="text-xs text-slate-400">Searching usernames…</p>}
-      {results.length > 0 && <section className="space-y-2"><h4 className="text-xs uppercase tracking-wider text-slate-500">People</h4>{results.map(renderPerson)}</section>}
-      {incomingRequests.length > 0 && <section className="space-y-2"><h4 className="text-xs uppercase tracking-wider text-slate-500">Friend requests · {incomingRequests.length}</h4>{incomingRequests.map((request) => { const person=people[request.sender_id] || {id:request.sender_id,username:'traveler',full_name:'Caspian Pal member'}; return <div key={request.id} className="flex items-center gap-3 rounded-2xl border border-[#252a35] bg-[#12151e] p-3"><div className="flex-1 min-w-0"><p className="text-sm font-semibold">{person.full_name}</p><p className="text-xs text-sky-300">@{person.username}</p></div><button onClick={() => respond(request,'accepted')} className="h-9 px-3 rounded-lg bg-amber-400 text-[#1a1300] text-xs font-bold">Accept</button><button onClick={() => respond(request,'declined')} className="h-9 px-3 rounded-lg bg-[#252a35] text-xs">Decline</button></div>; })}</section>}
-      <section className="space-y-2"><h4 className="text-xs uppercase tracking-wider text-slate-500">Your travel friends · {friends.length}</h4>
-        {friends.map((friend) => <button key={friend.id} onClick={() => openChat(friend)} className="w-full flex items-center gap-3 rounded-2xl border border-[#252a35] bg-[#12151e] p-3 text-left"><div className="w-11 h-11 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 p-[1px]"><div className="w-full h-full rounded-full bg-[#0e1017] flex items-center justify-center font-bold overflow-hidden">{friend.avatar_url ? <img src={friend.avatar_url} alt="" className="w-full h-full object-cover"/> : (friend.full_name || friend.username || 'T').slice(0,1).toUpperCase()}</div></div><div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">{friend.full_name || friend.username}</p><p className="text-xs text-sky-300 truncate">@{friend.username}</p></div><MessageSquare size={17} className="text-slate-500"/></button>)}
-        {friends.length === 0 && !query.trim() && incomingRequests.length === 0 && <div className="py-8 text-center"><Plane size={26} className="mx-auto text-slate-500 mb-2"/><p className="text-sm text-slate-400">Abhi friends nahi hain. Username se traveler dhoondo.</p></div>}
-      </section>
-    </div>
-    {error && !activeFriend && <p role="alert" className="px-4 pb-2 text-xs text-rose-300">{error}</p>}
+
+  return <div className="relative flex flex-col h-full min-h-0">
+    <MessagesInbox currentUser={currentUser} friends={friends} incomingRequests={incomingRequests}
+      outgoingRequests={outgoingRequests} people={people} query={query} setQuery={setQuery}
+      results={results} searching={searching} renderPerson={renderPerson} openChat={openChat}
+      respond={respond} recentMessages={recentMessages} />
+    {error && <p role="alert" className="px-4 pb-2 text-xs text-rose-300">{error}</p>}
     {incomingCall && <div className="absolute inset-0 z-[60] bg-black/70 flex items-center justify-center p-5"><div className="w-full rounded-3xl bg-[#13161f] border border-[#303648] p-5 text-center space-y-4"><div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-sky-400 to-violet-500 flex items-center justify-center text-xl font-bold">{(people[incomingCall.caller_id]?.full_name || 'T').slice(0,1).toUpperCase()}</div><h3 className="font-bold">{people[incomingCall.caller_id]?.full_name || 'Your travel friend'} is calling</h3><p className="text-sm text-slate-400">{incomingCall.call_type === 'video' ? 'Video' : 'Voice'} call</p><div className="flex gap-3"><button onClick={declineCall} className="flex-1 h-11 rounded-xl bg-rose-500 font-bold">Decline</button><button onClick={acceptCall} className="flex-1 h-11 rounded-xl bg-emerald-500 text-black font-bold">Accept</button></div></div></div>}
     {activeCall && <CallOverlay call={activeCall} onEnd={endCall}/>}
   </div>;
